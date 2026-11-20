@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ortho Motion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Poppins:wght@500;700&family=Unbounded:wght@700&family=JetBrains+Mono:wght@500;800&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a precise studio instrument; quiet chrome so the artwork does the shouting
+   IDEA: a drafting table — the plate on the left, the instrument panel on the right
+   PICTURE: the live orthographic loop itself, as large as the screen allows
+   COLOUR and TYPE: black / white plus one mint accent; Space Grotesk throughout
+   LAYOUT: stage fills the left, 340px panel right; stacks stage-then-panel under 900px */
+:root{color-scheme:light dark;--bg:light-dark(#e9e8e4,#0a0a0a);--panel:light-dark(#fff,#141414);--ink:light-dark(#111,#f2f2f2);--mute:light-dark(#6a6a6a,#8e8e8e);--rule:light-dark(#dddcd7,#262626);--chip:light-dark(#f2f1ee,#1d1d1d);--acc:#b8f5d0;--accInk:#0b0b0b}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Space Grotesk",system-ui,sans-serif;overflow-x:clip}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 350px;height:100vh}
+main{display:flex;flex-direction:column;padding:16px;gap:12px;min-height:0}
+.bar{display:flex;align-items:center;gap:12px}
+.bar input{flex:1}
+.time{font-variant-numeric:tabular-nums;color:var(--mute);font-size:13px;white-space:nowrap;width:9ch;text-align:right}
+.stage{flex:1;container-type:size;display:grid;place-items:center;min-height:0}
+.frame{position:relative;aspect-ratio:var(--arn);width:min(100cqw,calc(100cqh * var(--arn)));box-shadow:0 1px 0 var(--rule),0 20px 60px -30px #0008;background:repeating-conic-gradient(#8882 0 25%,#0000 0 50%) 0 0/20px 20px}
+.frame canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+.frame canvas:active{cursor:grabbing}
+.rec{position:absolute;top:10px;left:10px;background:#e5484d;color:#fff;font-size:12px;font-weight:500;padding:3px 9px;border-radius:99px;display:none}
+.hint{margin:0;color:var(--mute);font-size:13px;text-align:center}
+aside{background:var(--panel);border-left:1px solid var(--rule);overflow-y:auto;padding:20px 20px 32px}
+h1{font-size:24px;line-height:1.05;margin:0 0 4px;font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--mute);margin:0 0 8px;font-size:13px}
+section{border-top:1px solid var(--rule);padding:16px 0 4px}
+h2{font-size:13px;font-weight:500;color:var(--mute);margin:0 0 10px}
+h3{font-size:13px;font-weight:500;margin:4px 0 8px}
+.seg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.seg button,.btn{font:inherit;font-size:13px;border:1px solid var(--rule);background:var(--chip);color:var(--ink);border-radius:8px;padding:0 11px;min-height:36px;cursor:pointer}
+.seg button[aria-pressed=true],.btn[aria-pressed=true]{background:var(--acc);color:var(--accInk);border-color:var(--acc);font-weight:500}
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.presets button{min-height:44px;text-align:left}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.row{margin-bottom:10px}
+.row label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px}
+.row output{color:var(--mute);font-variant-numeric:tabular-nums}
+.segrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;font-size:13px}
+.segrow .seg{margin:0}
+input[type=range]{width:100%;accent-color:var(--ink);height:28px;margin:0}
+input[type=text],select{width:100%;font:inherit;font-size:16px;background:var(--chip);color:var(--ink);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;min-height:44px}
+.field{margin-bottom:10px}
+.field>span{display:block;font-size:13px;margin-bottom:4px}
+.note{font-size:13px;color:var(--mute);margin:0 0 12px}
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.col{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.col input{width:100%;height:36px;border:1px solid var(--rule);border-radius:8px;background:none;padding:2px;cursor:pointer}
+.pals{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.pal{width:44px;height:44px;border-radius:10px;border:1px solid var(--rule);cursor:pointer;padding:0;position:relative;overflow:hidden}
+.pal span{position:absolute;inset:auto 7px 7px auto;width:16px;height:16px;border:2px solid;border-radius:3px;transform:rotate(45deg) skew(-10deg,-10deg)}
+.fmt{border:1px solid var(--rule);border-radius:10px;padding:12px;margin-bottom:8px}
+.fmt b{font-weight:500}
+.fmt p{margin:2px 0 10px;font-size:13px;color:var(--mute)}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.acts .btn{flex:1;min-height:40px}
+.btn.main{background:var(--ink);color:var(--panel);border-color:var(--ink);font-weight:500}
+.btn:disabled{opacity:.5;cursor:default}
+.play{width:44px;height:44px;border-radius:50%;padding:0;display:grid;place-items:center}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 14px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw}
+.toast.on{opacity:1}
+[hidden]{display:none!important}
+@media(max-width:900px){.app{grid-template-columns:1fr;height:auto}.stage{height:min(92vw,68vh);flex:none}aside{border-left:0;border-top:1px solid var(--rule)}}
+@media(prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+<main>
+  <div class="bar">
+    <button class="btn play" id="play" aria-label="Pause">❚❚</button>
+    <input type="range" id="scrub" min="0" max="1" step="0.001" value="0" aria-label="Timeline">
+    <span class="time" id="time">0.00 s</span>
+  </div>
+  <div class="stage"><div class="frame" id="frame"><canvas id="cv"></canvas><div class="rec" id="recTag">● Recording loop</div></div></div>
+  <p class="hint">Drag the artwork to orbit · Space to play or pause · every pattern loops seamlessly</p>
+</main>
+<aside>
+  <h1>Ortho Motion</h1>
+  <p class="sub">Orthographic loop generator for isometric type and block animations.</p>
+
+  <section><h2>Pattern</h2><div class="presets" id="presets"></div></section>
+
+  <section><h2>Pattern settings</h2><div id="pset"></div><button class="btn" id="seedBtn" style="margin-bottom:12px">Shuffle layout</button></section>
+
+  <section><h2>Type</h2>
+    <label class="field" id="mainTextRow"><span id="mainTextLbl">Text</span><input type="text" data-key="text" maxlength="80"></label>
+    <p class="note" id="textNote"></p>
+    <label class="field"><span>Font</span><select data-key="font"><option value="Poppins">Poppins</option><option value="Unbounded">Unbounded</option><option value="Mono">JetBrains Mono</option></select></label>
+    <div id="faceGrp">
+      <h3>Text on faces</h3>
+      <label class="field"><span>Face text</span><input type="text" data-key="faceText" maxlength="60" placeholder="e.g. MAKE IT SIMPLE"></label>
+      <div class="segrow">Faces<div class="seg"><button data-tog="fTop">Top</button><button data-tog="fLeft">Left</button><button data-tog="fRight">Right</button></div></div>
+      <div class="segrow">Anchor<div class="seg" data-k="anchor"><button data-v="object">Object</button><button data-v="world">World</button></div></div>
+      <div id="faceSliders"></div>
+      <p class="note">Object: text rides with each block. World: blocks move through fixed text.</p>
+    </div>
+  </section>
+
+  <section><h2>Render</h2>
+    <div class="seg" data-k="style"><button data-v="wire">Wire</button><button data-v="hidden">Hidden line</button><button data-v="solid">Solid</button><button data-v="shaded">Shaded</button><button data-v="ghost">Ghost</button></div>
+    <div class="pals" id="pals"></div>
+    <div class="cols">
+      <label class="col">Background<input type="color" data-key="bg"></label>
+      <label class="col">Lines &amp; type<input type="color" data-key="line"></label>
+      <label class="col">Fill<input type="color" data-key="fill"></label>
+    </div>
+  </section>
+
+  <section><h2>Motion</h2>
+    <div id="motion"></div>
+    <div class="segrow">Easing<div class="seg" data-k="ease"><button data-v="linear">Linear</button><button data-v="smooth">Smooth</button><button data-v="expo">Snap</button><button data-v="back">Back</button></div></div>
+    <h3>Spin whole object, turns per loop</h3>
+    <div id="spin"></div>
+  </section>
+
+  <section><h2>Camera</h2>
+    <div class="seg" data-k="view"><button data-v="iso">Isometric</button><button data-v="dim">Dimetric</button><button data-v="tri">Trimetric</button><button data-v="front">Front</button><button data-v="free">Free</button></div>
+    <div id="camera"></div>
+  </section>
+
+  <section><h2>Export</h2>
+    <div class="segrow">Frame<div class="seg" data-k="ar"><button data-v="1:1">1:1</button><button data-v="4:5">4:5</button><button data-v="16:9">16:9</button><button data-v="9:16">9:16</button></div></div>
+    <div class="segrow">Background<div class="seg"><button data-tog="transparent">Transparent</button></div></div>
+    <div class="fmt"><b>Web embed (HTML)</b><p>Best for websites: about 20 KB, sharp at any size, live and looping. Drop it in an iframe or paste the code.</p>
+      <div class="acts"><button class="btn main" id="copyEmbed">Copy code</button><button class="btn" id="saveEmbed">Save .html</button></div></div>
+    <div class="fmt"><b>Video (MP4 / WebM)</b><p>Hero backgrounds and socials. One seamless loop at 1080p. Use autoplay muted loop playsinline.</p>
+      <div class="acts"><button class="btn" id="recBtn">Record loop</button></div></div>
+    <div class="fmt"><b>GIF</b><p>Works everywhere, including email and CMS editors. Heavier and limited to 256 colours.</p>
+      <div class="acts"><select data-key="gifSize" aria-label="GIF size" style="flex:1;min-height:40px"><option value="480">480 px</option><option value="720">720 px</option><option value="1080">1080 px</option></select><button class="btn" id="gifBtn">Save GIF</button></div></div>
+    <div class="fmt"><b>PNG frame</b><p>A 2048 px still of the current moment.</p>
+      <div class="acts"><button class="btn" id="png">Save PNG</button></div></div>
+  </section>
+</aside>
+</div>
+<div class="toast" id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script id="engine">
+window.OrthoEngine=function(cv,S){
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)),TAU=Math.PI*2;
+const rng=s=>()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const EASE={linear:x=>x,smooth:x=>x<.5?4*x*x*x:1-((-2*x+2)**3)/2,
+  expo:x=>x<=0?0:x>=1?1:x<.5?(2**(20*x-10))/2:(2-(2**(-20*x+10)))/2,
+  back:x=>{const c=1.70158*1.525;return x<.5?(((2*x)**2)*((c+1)*2*x-c))/2:(((2*x-2)**2)*((c+1)*(x*2-2)+c)+2)/2}};
+const ease=x=>(EASE[S.ease]||EASE.smooth)(x);
+const FONTS={Poppins:{f:'Poppins',w:500,wb:700},Unbounded:{f:'Unbounded',w:700,wb:700},Mono:{f:'"JetBrains Mono"',w:500,wb:800}};
+const R=new THREE.WebGLRenderer({canvas:cv,antialias:true,preserveDrawingBuffer:true,alpha:true});
+R.setPixelRatio(Math.min(2,window.devicePixelRatio||1));
+const scene=new THREE.Scene(),cam=new THREE.OrthographicCamera(-1,1,1,-1,-200,400);
+const off={polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1,side:THREE.DoubleSide};
+const M={fill:new THREE.MeshBasicMaterial(off),bg:new THREE.MeshBasicMaterial(off),line:new THREE.LineBasicMaterial(),
+  ghost:new THREE.MeshBasicMaterial({transparent:true,opacity:.32,depthWrite:false,side:THREE.DoubleSide}),
+  shade:[0,1,2].map(()=>new THREE.MeshBasicMaterial(off))};
+const shadeArr=[M.shade[2],M.shade[2],M.shade[0],M.shade[0],M.shade[1],M.shade[1]];
+const FM=new THREE.ShaderMaterial({side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:1,
+  uniforms:{map:{value:null},cT:{value:new THREE.Color()},cL:{value:new THREE.Color()},cR:{value:new THREE.Color()},ink:{value:new THREE.Color()},
+    en:{value:new THREE.Vector3(1,1,1)},lh:{value:.4},asp:{value:8},solid:{value:1},op:{value:1},uW:{value:0}},
+  vertexShader:`varying vec3 vP;varying vec3 vN;uniform float uW;
+void main(){vec3 sc=vec3(length(modelMatrix[0].xyz),length(modelMatrix[1].xyz),length(modelMatrix[2].xyz));
+vec4 wp=modelMatrix*vec4(position,1.);vP=mix(position*sc,wp.xyz,uW);vN=mix(normal,normalize(mat3(modelMatrix)*normal),uW);
+gl_Position=projectionMatrix*viewMatrix*wp;}`,
+  fragmentShader:`varying vec3 vP;varying vec3 vN;uniform sampler2D map;uniform vec3 cT,cL,cR,ink,en;uniform float lh,asp,solid,op;
+void main(){vec3 n=normalize(vN),a=abs(n);vec2 uv;vec3 base;float on;
+if(a.y>=a.x&&a.y>=a.z){uv=vec2(vP.x,-vP.z*sign(n.y));base=cT;on=en.x;}
+else if(a.z>=a.x){uv=vec2(vP.x*sign(n.z),vP.y);base=cL;on=en.y;}
+else{uv=vec2(-vP.z*sign(n.x),vP.y);base=cR;on=en.z;}
+float t=on>.5?texture2D(map,vec2(uv.x/(lh*asp),uv.y/lh)).a:0.;
+if(solid<.5&&t<.05)discard;
+gl_FragColor=vec4(mix(base,ink,t),solid<.5?t:op);}`});
+const GB=new THREE.BoxGeometry(1,1,1),GE=new THREE.EdgesGeometry(GB),GP=new THREE.PlaneGeometry(1,1),GPE=new THREE.EdgesGeometry(GP);
+let textMats=[],faceTex=null,cur=null,piv=null,buildId=0;
+
+const faceOn=()=>S.preset!=='twist'&&!!S.faceText.trim()&&(S.fTop||S.fLeft||S.fRight);
+const fillMat=()=>faceOn()?FM:S.style==='shaded'?shadeArr:S.style==='hidden'?M.bg:S.style==='ghost'?M.ghost:M.fill;
+const meshVis=()=>S.style!=='wire'||faceOn();
+function box(parent){
+  const o=new THREE.Group(),m=new THREE.Mesh(GB,fillMat());m.visible=meshVis();
+  const l=new THREE.LineSegments(GE,M.line);l.visible=S.style!=='ghost';o.add(m,l);parent.add(o);return o;
+}
+function colors(){
+  scene.background=S.transparent?null:new THREE.Color(S.bg);R.setClearColor(S.bg,S.transparent?0:1);
+  M.fill.color.set(S.fill);M.bg.color.set(S.bg);M.line.color.set(S.line);M.ghost.color.set(S.fill);
+  const h={};new THREE.Color(S.fill).getHSL(h);
+  const L=h.l<.2?[.86,.5,.24]:[Math.min(1,h.l+.3),h.l,h.l>.3?h.l-.32:Math.min(1,h.l+.14)];
+  M.shade.forEach((m,i)=>m.color.setHSL(h.h,h.s,L[i]));
+  const U=FM.uniforms,st=S.style;
+  const tones=st==='shaded'?M.shade.map(m=>m.color):st==='hidden'?[M.bg.color,M.bg.color,M.bg.color]:[M.fill.color,M.fill.color,M.fill.color];
+  U.cT.value.copy(tones[0]);U.cL.value.copy(tones[1]);U.cR.value.copy(tones[2]);U.ink.value.set(S.line);
+  U.en.value.set(S.fTop?1:0,S.fLeft?1:0,S.fRight?1:0);U.lh.value=S.faceSize;U.uW.value=S.anchor==='world'?1:0;
+  U.solid.value=st==='wire'?0:1;U.op.value=st==='ghost'?.32:1;
+  const tr=st==='wire'||st==='ghost';if(FM.transparent!==tr){FM.transparent=tr;FM.depthWrite=!tr;FM.needsUpdate=true}
+  textMats.forEach(m=>m.color.set(S.line));
+}
+function lineTex(str,N){
+  const W=1024,H=Math.max(24,Math.round(W/N)),c=document.createElement('canvas'),x=c.getContext('2d'),F=FONTS[S.font];
+  c.width=W;c.height=H;let fs=H*.84;x.font=`${F.w} ${fs}px ${F.f}`;
+  const w=x.measureText(str).width;if(w>W*.96){fs*=W*.96/w;x.font=`${F.w} ${fs}px ${F.f}`}
+  x.fillStyle='#fff';x.textBaseline='middle';x.fillText(str,W*.02,H*.54);
+  const t=new THREE.CanvasTexture(c);t.anisotropy=R.capabilities.getMaxAnisotropy();return t;
+}
+function makeFaceTex(){
+  if(faceTex)faceTex.dispose();
+  const F=FONTS[S.font],H=128,c=document.createElement('canvas'),x=c.getContext('2d'),str=S.faceText.trim()+'  ';
+  x.font=`${F.wb} ${H*.74}px ${F.f}`;const w=Math.max(H,Math.ceil(x.measureText(str).width));
+  c.width=w;c.height=H;x.font=`${F.wb} ${H*.74}px ${F.f}`;x.fillStyle='#fff';x.textBaseline='middle';x.fillText(str,0,H*.54);
+  faceTex=new THREE.CanvasTexture(c);faceTex.wrapS=faceTex.wrapT=THREE.RepeatWrapping;faceTex.anisotropy=R.capabilities.getMaxAnisotropy();
+  FM.uniforms.map.value=faceTex;FM.uniforms.asp.value=w/H;
+}
+
+const P={
+  twist(){
+    const N=S.density|0,Z=2,h=Z/N,g=new THREE.Group(),sl=[];
+    const segs=S.text.split('/').map(s=>s.trim()).filter(Boolean);if(!segs.length)segs.push(' ');
+    for(let i=0;i<N;i++){
+      const s=new THREE.Group();s.userData.y=-Z/2+h*(i+.5);
+      if(S.style!=='wire'){const core=new THREE.Mesh(GB,fillMat());core.scale.set(Z*.996,h*1.002,Z*.996);s.add(core)}
+      const mat=new THREE.MeshBasicMaterial({map:lineTex(segs[(N-1-i)%segs.length],N),transparent:true,side:THREE.DoubleSide,depthWrite:false,color:S.line});
+      textMats.push(mat);
+      for(let k=0;k<4;k++){const a=k*Math.PI/2,p=new THREE.Mesh(GP,mat);p.scale.set(Z,h,1);p.position.set(Math.sin(a)*Z/2,0,Math.cos(a)*Z/2);p.rotation.y=a;p.renderOrder=1;s.add(p)}
+      g.add(s);sl.push(s);
+    }
+    return{g,cy:0,r:Z*1.1,upd(t){const sp=S.stagger*.6,turn=(S.p_turns||1)*Math.PI/2;sl.forEach((s,i)=>{
+      const d=sp*(N-1-i)/Math.max(1,N-1);s.rotation.y=ease(clamp((t-d)/(1-sp)))*turn;
+      s.position.y=s.userData.y*(1+S.amp*.8*Math.sin(Math.PI*t))})}};
+  },
+  sky(){
+    const G=S.density|0,rnd=rng(S.seed),g=new THREE.Group(),cells=[],mh=Math.max(2,G*.9),c=(G-1)/2;
+    for(let x=0;x<G;x++)for(let z=0;z<G;z++){
+      const peak=1-Math.hypot(x-c,z-c)/G,hh=()=>Math.round(rnd()*mh*peak*1.4+rnd()*.6);
+      const o=box(g);o.position.set(x-c,0,z-c);cells.push({o,a:hh(),b:hh(),d:(x+z)/Math.max(1,2*G-2)});
+    }
+    return{g,cy:mh*.35,r:G*.95+mh*.3,upd(t){const s=1-S.p_gap;cells.forEach(e=>{
+      const p=.5-.5*Math.cos(TAU*(t-e.d*S.stagger*.5)),h=e.a+(e.b-e.a)*p*S.amp;
+      e.o.visible=h>.02;e.o.scale.set(s,Math.max(h,.001),s);e.o.position.y=h/2})}};
+  },
+  pin(){
+    const g=new THREE.Group(),L=S.p_len,w=S.p_thick,o=(L-2*w)/2,c=(o+w)/3;g.position.set(-c,-c,-c);
+    const bars=[[L,w,w,o,0,w,0],[w,L,w,w,o,0,1],[w,w,L,0,w,o,2]].map(b=>{
+      const m=box(g);m.scale.set(b[0],b[1],b[2]);m.userData={p:new THREE.Vector3(b[3],b[4],b[5]),ax:b[6]};return m});
+    return{g,cy:0,r:L*.62+w*.5+S.amp*.5,upd(t){bars.forEach((m,k)=>{const u=m.userData;
+      m.position.copy(u.p);m.position.setComponent(u.ax,u.p.getComponent(u.ax)+S.amp*.9*w*Math.sin(TAU*(t-k*S.stagger/3)));
+      const d=k*S.stagger*.15,a=S.p_twist*Math.PI/2*ease(clamp((t-d)/(1-.3*S.stagger)));
+      m.rotation.set(u.ax===0?a:0,u.ax===1?a:0,u.ax===2?a:0)})}};
+  },
+  planes(){
+    const N=S.density|0,g=new THREE.Group(),sz=2.2,gap=S.p_space,fr=[];
+    for(let i=0;i<N;i++){
+      const o=new THREE.Group(),m=new THREE.Mesh(GP,faceOn()?FM:S.style==='shaded'?M.shade[1]:fillMat());m.visible=meshVis();
+      const l=new THREE.LineSegments(GPE,M.line);l.visible=S.style!=='ghost';
+      o.add(m,l);o.scale.set(sz,sz,1);o.userData.z=(i-(N-1)/2)*gap;g.add(o);fr.push(o);
+    }
+    return{g,cy:0,r:sz*.85+N*gap*.35+S.amp*.5,upd(t){fr.forEach((o,i)=>{
+      const v=S.amp*.9*Math.sin(TAU*(t-S.stagger*i/N));o.position.set(v,-v*.5,o.userData.z)})}};
+  },
+  vox(){
+    const R0=Math.round(clamp(S.density,4,18)),txt=(S.text.replace(/\//g,' ').trim()||'ISO').slice(0,14),F=FONTS[S.font],Dp=S.p_depth|0;
+    const c=document.createElement('canvas'),x=c.getContext('2d'),fs=Math.round(R0/.72);
+    x.font=`${F.wb} ${fs}px ${F.f}`;const W=Math.ceil(x.measureText(txt).width)+2,H=Math.ceil(fs*1.25);
+    c.width=W;c.height=H;x.font=`${F.wb} ${fs}px ${F.f}`;x.fillText(txt,1,Math.round(fs*.95));
+    const d=x.getImageData(0,0,W,H).data,pts=[];let lo=H,hi=0;
+    for(let r=0;r<H;r++)for(let q=0;q<W;q++)if(d[(r*W+q)*4+3]>110&&pts.length*Dp<2600){pts.push([q,r]);lo=Math.min(lo,r);hi=Math.max(hi,r)}
+    const g=new THREE.Group(),vx=[];
+    pts.forEach(([q,r])=>{for(let k=0;k<Dp;k++){const o=box(g);o.userData={y:hi-r,d:q/W};o.position.set(q-W/2,hi-r,(Dp-1)/2-k);vx.push(o)}});
+    return{g,cy:(hi-lo)/2,r:Math.max(W*.55,(hi-lo)*.9),upd(t){const dr=S.amp*8;vx.forEach(o=>{
+      const u=o.userData,dl=S.stagger*.13*u.d,p=ease(clamp((t-dl)/.25)),q=ease(clamp((t-.62-dl)/.25)),s=Math.min(p,1-q);
+      o.visible=s>.01;o.scale.setScalar(Math.max(s,.001));o.position.y=u.y+dr*(1-p)-dr*q})}};
+  },
+  tree(){
+    const rnd=rng(S.seed),D=S.density|0,th=S.p_thick,br=S.p_branch,L0=S.p_len,segs=[];
+    const AX=[new THREE.Vector3(1,0,0),new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,1)];
+    const grow=(p,ax,dir,depth,t0)=>{
+      if(segs.length>=360)return;
+      const len=Math.max(.5,Math.round(L0*(.55+rnd()*.9)*(1-depth/(D+3))*2)/2),v=AX[ax].clone().multiplyScalar(dir);
+      const b=p.clone().addScaledVector(v,len);segs.push({a:p.clone(),v,ax,len,t0});
+      if(depth>=D)return;
+      const n=1+(rnd()<br?1:0)+(rnd()<br*.45?1:0),opts=[];
+      for(let a=0;a<3;a++)for(const s of[1,-1]){if(a===ax&&s===-dir)continue;if(a===1&&s===-1&&b.y<2.5)continue;opts.push([a,s,a===1&&s===1?4:a===1?.4:a===ax?1.2:1])}
+      for(let k=0;k<n&&opts.length;k++){
+        let r=rnd()*opts.reduce((s,o)=>s+o[2],0),i=0;while(i<opts.length-1&&(r-=opts[i][2])>0)i++;
+        const o=opts.splice(i,1)[0];grow(b,o[0],o[1],depth+1,t0+len);
+      }
+    };
+    grow(new THREE.Vector3(),1,1,0,0);
+    const Dm=Math.max(...segs.map(s=>s.t0+s.len)),g=new THREE.Group(),bb=new THREE.Box3();
+    segs.forEach(s=>{s.o=box(g);bb.expandByPoint(s.a);bb.expandByPoint(s.a.clone().addScaledVector(s.v,s.len))});
+    const pos=new Float32Array(segs.length*6),geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    const sk=new THREE.LineSegments(geo,M.line);sk.visible=!!S.p_skel;sk.frustumCulled=false;sk.renderOrder=2;g.add(sk);
+    const ctr=bb.getCenter(new THREE.Vector3()),sz=bb.getSize(new THREE.Vector3());g.position.set(-ctr.x,0,-ctr.z);
+    return{g,cy:ctr.y,r:Math.max(sz.x,sz.y,sz.z)*.62+th,upd(t){
+      const gr=t<.64?ease(clamp(t/.56)):1-ease(clamp((t-.68)/.3)),st=Math.max(.001,S.stagger);
+      segs.forEach((s,i)=>{
+        const s0=s.t0/Dm*st,s1=s0+s.len/Dm*st+(1-st),cl=s.len*clamp((gr-s0)/(s1-s0));
+        s.o.visible=cl>.001;const sc=[th,th,th];sc[s.ax]=cl+th;s.o.scale.set(sc[0],sc[1],sc[2]);
+        s.o.position.copy(s.a).addScaledVector(s.v,cl/2);
+        const e=s.a.clone().addScaledVector(s.v,cl);pos.set([s.a.x,s.a.y,s.a.z,e.x,e.y,e.z],i*6);
+      });geo.attributes.position.needsUpdate=true}};
+  }
+};
+
+function setCam(){
+  const w=cv.width||1,h=cv.height||1,a=w/h,base=(cur?cur.r:2)*2.4/S.zoom,vh=a<1?base/a:base,cy=cur?cur.cy:0;
+  cam.left=-vh*a/2;cam.right=vh*a/2;cam.top=vh/2;cam.bottom=-vh/2;
+  const y=S.yaw*Math.PI/180,p=S.pitch*Math.PI/180;
+  cam.position.set(Math.cos(p)*Math.sin(y)*80,cy+Math.sin(p)*80,Math.cos(p)*Math.cos(y)*80);cam.lookAt(0,cy,0);cam.updateProjectionMatrix();
+}
+function build(){
+  if(piv){scene.remove(piv);textMats.forEach(m=>{m.map.dispose();m.dispose()});textMats=[]}
+  if(faceOn())makeFaceTex();
+  cur=P[S.preset]();piv=new THREE.Group();piv.position.y=cur.cy;cur.g.position.y-=cur.cy;piv.add(cur.g);scene.add(piv);colors();setCam();
+}
+function rebuild(){
+  const id=++buildId,F=FONTS[S.font],go=()=>{if(id===buildId)build()};
+  if(document.fonts&&document.fonts.load)return document.fonts.load(`${F.wb} 40px ${F.f}`).then(()=>document.fonts.load(`${F.w} 40px ${F.f}`)).then(go,go);
+  go();return Promise.resolve();
+}
+function render(t){
+  if(cur){cur.upd(Math.min(t,.99999));const e=ease(t)*TAU;piv.rotation.set(S.spinX*e,S.spinY*e,S.spinZ*e)}
+  R.render(scene,cam);
+}
+function resize(){R.setPixelRatio(Math.min(2,window.devicePixelRatio||1));R.setSize(cv.clientWidth||1,cv.clientHeight||1,false);setCam()}
+function setRenderSize(w,h){R.setPixelRatio(1);R.setSize(w,h,false);setCam()}
+return{rebuild,render,resize,setRenderSize,setCam,colors,R};
+};
+</script>
+<script>
+{
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const GIFENC='https://cdn.jsdelivr.net/npm/gifenc@1.0.3/+esm';
+const VIEWS={iso:[45,35.26],dim:[45,30],tri:[28,24],front:[0,0]};
+const PRESETS=[['twist','Type twist'],['sky','Skyline'],['pin','Interlock'],['planes','Plane stack'],['vox','Voxel type'],['tree','Tree growth']];
+const pct=v=>Math.round(v*100)+'%',deg=v=>(v>0?'+':'')+v*90+'°',dec=v=>(+v).toFixed(2);
+const PS={
+  twist:[['density','Lines',4,28,1],['p_turns','Turn per loop',1,4,1,v=>v*90+'°']],
+  sky:[['density','Grid',3,12,1],['p_gap','Gap',0,.5,.01,pct]],
+  pin:[['p_len','Bar length',2,4,.1,dec],['p_thick','Thickness',.4,1.4,.05,dec],['p_twist','Bar roll',-4,4,1,deg]],
+  planes:[['density','Planes',2,14,1],['p_space','Spacing',.1,.7,.01,dec]],
+  vox:[['density','Resolution',4,18,1],['p_depth','Extrude',1,4,1]],
+  tree:[['density','Depth',2,7,1],['p_len','Branch length',1,4,.5],['p_thick','Thickness',.15,.9,.05,dec],['p_branch','Branching',0,1,.05,pct],['p_skel','Skeleton','seg',[[1,'On'],[0,'Off']]]]
+};
+const DEF={twist:{style:'wire',density:12,stagger:.6,amp:.35,text:'tangibilisation.',font:'Poppins',p_turns:1},
+  sky:{style:'solid',density:5,stagger:.7,amp:1,p_gap:0},
+  pin:{style:'hidden',stagger:1,amp:.6,p_len:2.5,p_thick:1,p_twist:1},
+  planes:{style:'wire',density:5,stagger:.5,amp:.5,p_space:.4},
+  vox:{style:'shaded',density:9,stagger:.8,amp:.6,text:'EXPO',font:'Unbounded',p_depth:1},
+  tree:{style:'ghost',density:5,stagger:1,p_len:2,p_thick:.45,p_branch:.55,p_skel:1,bg:'#ffffff',line:'#111111',fill:'#f4a3a3'}};
+const PAL=[['#0b0b0b','#ffffff','#000000'],['#f1efe9','#111111','#f1efe9'],['#ff8f8f','#111111','#a6f2d4'],['#ffffff','#111111','#f4a3a3'],['#2f2f2f','#e8e8e8','#bdbdbd'],['#1d3fd6','#ffffff','#1d3fd6']];
+const S=Object.assign({preset:'twist',bg:'#0b0b0b',line:'#ffffff',fill:'#000000',loop:6,view:'iso',yaw:45,pitch:35.26,zoom:1,ar:'1:1',seed:7,
+  ease:'smooth',spinX:0,spinY:0,spinZ:0,faceText:'',fTop:false,fLeft:true,fRight:true,faceSize:.45,anchor:'object',transparent:false,gifSize:'720'},DEF.twist);
+const cv=$('#cv'),fr=$('#frame'),E=OrthoEngine(cv,S);
+const ro=new ResizeObserver(()=>{if(!busy)E.resize()});ro.observe(fr);
+
+const slider=(k,l,mn,mx,st)=>`<div class="row"><label for="i_${k}">${l}<output id="o_${k}"></output></label><input type="range" id="i_${k}" data-key="${k}" min="${mn}" max="${mx}" step="${st}"></div>`;
+const FMT={stagger:pct,amp:pct,loop:v=>(+v).toFixed(1)+' s',yaw:v=>Math.round(v)+'°',pitch:v=>(+v).toFixed(1)+'°',zoom:v=>(+v).toFixed(2)+'×',
+  faceSize:dec,spinX:v=>v==0?'Off':(v>0?'+':'')+v,spinY:v=>v==0?'Off':(v>0?'+':'')+v,spinZ:v=>v==0?'Off':(v>0?'+':'')+v};
+$('#presets').innerHTML=PRESETS.map(([v,n])=>`<button class="btn" data-k="preset" data-v="${v}">${n}</button>`).join('');
+$('#pals').innerHTML=PAL.map((p,i)=>`<button class="pal" data-pal="${i}" aria-label="Palette ${i+1}" style="background:${p[0]}"><span style="border-color:${p[1]};background:${p[2]}"></span></button>`).join('');
+$('#motion').innerHTML=slider('stagger','Stagger',0,1,.01)+`<div id="ampRow">${slider('amp','Amplitude',0,1,.01)}</div>`+slider('loop','Loop length',1,12,.5);
+$('#spin').innerHTML=['X','Y','Z'].map(a=>slider('spin'+a,'Spin '+a,-2,2,.25)).join('');
+$('#camera').innerHTML=slider('yaw','Yaw',-180,180,.5)+slider('pitch','Pitch',-89,89,.1)+slider('zoom','Zoom',.4,2.5,.01);
+$('#faceSliders').innerHTML=slider('faceSize','Text size',.12,1.5,.01);
+let lastPre='';
+function renderPset(){
+  $('#pset').innerHTML=PS[S.preset].map(([k,l,mn,mx,st,f])=>{
+    if(mn==='seg')return`<div class="segrow">${l}<div class="seg" data-k="${k}">${mx.map(([v,n])=>`<button data-v="${v}" data-num="1">${n}</button>`).join('')}</div></div>`;
+    if(f)FMT[k]=f;else delete FMT[k];return slider(k,l,mn,mx,st)}).join('');
+}
+function sync(){
+  if(lastPre!==S.preset){lastPre=S.preset;renderPset()}
+  $$('[data-v]').forEach(b=>{const k=b.dataset.k||b.parentElement.dataset.k;b.setAttribute('aria-pressed',String(S[k])===b.dataset.v)});
+  $$('[data-tog]').forEach(b=>b.setAttribute('aria-pressed',!!S[b.dataset.tog]));
+  $$('[data-key]').forEach(el=>{const k=el.dataset.key;
+    if(el.type==='range'){if(+el.value!==+S[k])el.value=S[k];const o=$('#o_'+k);if(o)o.textContent=(FMT[k]||(v=>v))(S[k])}
+    else if(document.activeElement!==el&&el.value!==String(S[k]))el.value=S[k]});
+  const tw=S.preset==='twist',vx=S.preset==='vox';
+  $('#mainTextRow').hidden=!(tw||vx);$('#mainTextLbl').textContent=vx?'Word':'Text';
+  $('#textNote').textContent=tw?'Use / to give each line its own words.':vx?'Up to 14 characters. Short words read best.':'Face text below wraps type onto the blocks.';
+  $('#faceGrp').hidden=tw;$('#ampRow').hidden=S.preset==='tree';$('#seedBtn').hidden=!(S.preset==='sky'||S.preset==='tree');
+  const [aw,ah]=S.ar.split(':').map(Number);fr.style.setProperty('--arn',aw/ah);
+}
+const REB=/^(preset|style|density|font|seed|text|faceText|fTop|fLeft|fRight|p_)/;
+let txtT=0;
+function set(k,v){
+  if(k==='preset'&&v!==S.preset)Object.assign(S,DEF[v]);
+  S[k]=v;
+  if(k==='view'&&VIEWS[v]){S.yaw=VIEWS[v][0];S.pitch=VIEWS[v][1]}
+  if(k==='yaw'||k==='pitch')S.view='free';
+  sync();
+  if(k==='text'||k==='faceText'){clearTimeout(txtT);txtT=setTimeout(E.rebuild,220)}
+  else if(REB.test(k)&&k!=='p_twist'&&k!=='p_turns'&&k!=='p_gap')E.rebuild();
+  else E.colors();
+  E.setCam();
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button[data-v]');if(b){set(b.dataset.k||b.parentElement.dataset.k,b.dataset.num?+b.dataset.v:b.dataset.v);return}
+  const g=e.target.closest('button[data-tog]');if(g){set(g.dataset.tog,!S[g.dataset.tog]);return}
+  const p=e.target.closest('[data-pal]');if(p){const c=PAL[+p.dataset.pal];S.bg=c[0];S.line=c[1];S.fill=c[2];sync();E.colors()}
+});
+document.addEventListener('input',e=>{const k=e.target.dataset&&e.target.dataset.key;if(k)set(k,e.target.type==='range'?+e.target.value:e.target.value)});
+document.addEventListener('change',e=>{const k=e.target.dataset&&e.target.dataset.key;if(k&&e.target.tagName==='SELECT')set(k,e.target.value)});
+$('#seedBtn').addEventListener('click',()=>set('seed',(Math.random()*1e9)|0));
+
+/* playback */
+let t=0,playing=true,last=performance.now(),rec=null,busy=false;
+const playBtn=$('#play'),scrub=$('#scrub');
+function setPlay(v){playing=v;playBtn.textContent=v?'❚❚':'▶';playBtn.setAttribute('aria-label',v?'Pause':'Play')}
+playBtn.addEventListener('click',()=>setPlay(!playing));
+scrub.addEventListener('input',()=>{if(rec||busy)return;setPlay(false);t=+scrub.value});
+document.addEventListener('keydown',e=>{if(e.code==='Space'&&!/INPUT|SELECT|TEXTAREA|BUTTON/.test(document.activeElement.tagName)){e.preventDefault();setPlay(!playing)}});
+let drag=null;
+cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY};cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag={x:e.clientX,y:e.clientY};
+  S.yaw=((S.yaw-dx*.4+540)%360)-180;S.pitch=Math.min(89,Math.max(-89,S.pitch+dy*.3));S.view='free';sync();E.setCam()});
+const endDrag=()=>{drag=null};cv.addEventListener('pointerup',endDrag);cv.addEventListener('pointercancel',endDrag);
+function tick(now){
+  const dt=Math.min(.1,(now-last)/1000);last=now;
+  if(!busy){
+    if(rec){t=(now-rec.start)/1000/S.loop;if(t>=1){t=0;rec.mr.stop();rec=null}}
+    else if(playing)t=(t+dt/S.loop)%1;
+    E.render(t);scrub.value=t;$('#time').textContent=(t*S.loop).toFixed(2)+' s';
+  }
+  requestAnimationFrame(tick);
+}
+
+/* export */
+let DL=null;
+(async()=>{try{if(window.claude&&window.claude.use)DL=await window.claude.use('downloads')}catch(e){}})();
+function toast(m){const el=$('#toast');el.textContent=m;el.classList.add('on');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('on'),3000)}
+async function save(name,blob){
+  if(DL){try{await DL.save({filename:name,data:blob});toast('Saved '+name)}catch(e){toast(e&&e.code==='declined'?'Save cancelled':'Could not save ('+((e&&e.code)||'error')+')')}}
+  else if(!window.claude){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+  else toast('Saving files is not available in this view');
+}
+const stamp=()=>`ortho-${S.preset}-${Date.now().toString(36)}`;
+function dims(short){const [aw,ah]=S.ar.split(':').map(Number);return aw>=ah?[Math.round(short*aw/ah),short]:[short,Math.round(short*ah/aw)]}
+function dimsLong(long){const [aw,ah]=S.ar.split(':').map(Number);return aw>=ah?[long,Math.round(long*ah/aw)]:[Math.round(long*aw/ah),long]}
+function restore(){busy=false;E.resize()}
+
+$('#png').addEventListener('click',()=>{
+  busy=true;const [w,h]=dimsLong(2048);E.setRenderSize(w,h);E.render(t);
+  cv.toBlob(b=>{restore();if(b)save(stamp()+'.png',b)},'image/png');
+});
+
+function embedHTML(){
+  const keep=Object.assign({},S);delete keep.gifSize;delete keep.view;
+  const bg=S.transparent?'transparent':S.bg;
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ortho Motion embed</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;700&family=Unbounded:wght@700&family=JetBrains+Mono:wght@500;800&display=swap" rel="stylesheet">
+<style>html,body{margin:0;height:100%;background:${bg};overflow:hidden}canvas{display:block;width:100%;height:100%}</style>
+</head><body><canvas id="c" aria-label="Animated isometric graphic" role="img"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>
+<script>${$('#engine').textContent}<\/script>
+<script>
+{const S=${JSON.stringify(keep)},c=document.getElementById('c'),E=OrthoEngine(c,S);
+new ResizeObserver(()=>E.resize()).observe(c);E.resize();
+const still=matchMedia('(prefers-reduced-motion: reduce)').matches,t0=performance.now();
+E.rebuild().then(()=>{const f=n=>{E.render(still?.5:((n-t0)/1000/S.loop)%1);requestAnimationFrame(f)};requestAnimationFrame(f)});}
+<\/script></body></html>`;
+}
+$('#copyEmbed').addEventListener('click',async()=>{
+  try{await navigator.clipboard.writeText(embedHTML());toast('Embed code copied. Save it as a .html file or use it as an iframe srcdoc.')}
+  catch(e){toast('Copy was blocked. Use Save .html instead.')}
+});
+$('#saveEmbed').addEventListener('click',()=>save(stamp()+'.html',new Blob([embedHTML()],{type:'text/html'})));
+
+$('#recBtn').addEventListener('click',()=>{
+  if(rec||busy)return;
+  const opt=[['video/mp4;codecs=avc1','mp4'],['video/webm;codecs=vp9','webm'],['video/webm;codecs=vp8','webm'],['video/webm','webm']]
+    .find(o=>window.MediaRecorder&&MediaRecorder.isTypeSupported(o[0]));
+  if(!opt||!cv.captureStream){toast('This browser cannot record the canvas');return}
+  const wasT=S.transparent;if(opt[1]==='mp4'&&wasT){S.transparent=false;E.colors()}
+  const [w,h]=dims(1080);E.setRenderSize(w,h);
+  const mr=new MediaRecorder(cv.captureStream(60),{mimeType:opt[0],videoBitsPerSecond:16e6}),ch=[];
+  const btn=$('#recBtn');btn.disabled=true;btn.textContent='Recording…';$('#recTag').style.display='block';
+  mr.ondataavailable=e=>{if(e.data.size)ch.push(e.data)};
+  mr.onstop=()=>{btn.disabled=false;btn.textContent='Record loop';$('#recTag').style.display='none';
+    if(wasT){S.transparent=true;E.colors()}E.resize();save(stamp()+'.'+opt[1],new Blob(ch,{type:opt[0].split(';')[0]}))};
+  setPlay(true);mr.start();rec={mr,start:performance.now()};
+});
+
+$('#gifBtn').addEventListener('click',async()=>{
+  if(busy||rec)return;
+  const btn=$('#gifBtn');let mod;
+  btn.disabled=true;btn.textContent='Loading…';
+  try{mod=await import(GIFENC)}catch(e){btn.disabled=false;btn.textContent='Save GIF';toast('Could not load the GIF encoder');return}
+  busy=true;
+  const [w,h]=dimsLong(+S.gifSize),fps=Math.max(12,Math.min(30,Math.floor(150/S.loop))),n=Math.round(S.loop*fps);
+  E.setRenderSize(w,h);
+  const oc=document.createElement('canvas');oc.width=w;oc.height=h;const ox=oc.getContext('2d',{willReadFrequently:true});
+  const enc=mod.GIFEncoder(),tr=S.transparent;
+  for(let i=0;i<n;i++){
+    E.render(i/n);ox.clearRect(0,0,w,h);ox.drawImage(cv,0,0,w,h);
+    const d=ox.getImageData(0,0,w,h).data;
+    const pal=mod.quantize(d,256,tr?{format:'rgba4444',oneBitAlpha:true}:{}),idx=mod.applyPalette(d,pal,tr?'rgba4444':'rgb565');
+    const ti=tr?pal.findIndex(p=>p[3]===0):-1;
+    enc.writeFrame(idx,w,h,{palette:pal,delay:Math.round(1000/fps),transparent:ti>=0,transparentIndex:Math.max(0,ti)});
+    if(i%4===0){btn.textContent=`Encoding ${Math.round(i/n*100)}%`;await new Promise(r=>setTimeout(r,0))}
+  }
+  enc.finish();restore();btn.disabled=false;btn.textContent='Save GIF';
+  save(stamp()+'.gif',new Blob([enc.bytes()],{type:'image/gif'}));
+});
+
+sync();E.rebuild();requestAnimationFrame(tick);
+}
+</script>
+</body>
+</html>
